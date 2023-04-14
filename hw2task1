@@ -1,0 +1,645 @@
+package hw2task1;
+
+import java.util.*;
+
+public class Checkerboard {
+    private static final int ROWS = 8;
+    private static final int COLUMNS = 8;
+    private static final String WHITE = "white";
+    private static final String BLACK = "black";
+
+    private Cell[][] board;
+    private int whiteCheckers;
+    private int blackCheckers;
+
+    void initializeBoard(String whiteCoords, String blackCoords) {
+        board = new Cell[ROWS][COLUMNS];
+        for (int row = 0; row < ROWS; row++) {
+            for (int col = 0; col < COLUMNS; col++) {
+                board[row][col] = new Cell(null, col, row);
+            }
+        }
+
+        initCheckers(whiteCoords, Color.WHITE);
+        initCheckers(blackCoords, Color.BLACK);
+    }
+
+
+    private void initCheckers(String positions, Color color) {
+        for (String pos : positions.split(" ")) {
+            int x = pos.charAt(0) - 'a';
+            int y = Integer.parseInt(pos.substring(1)) - 1;
+            board[x][y] = new Cell(color, x, y);
+        }
+        if (color == Color.WHITE) {
+            whiteCheckers = countCheckers(Color.WHITE);
+            blackCheckers = countCheckers(Color.BLACK);
+        } else {
+            whiteCheckers = countCheckers(Color.BLACK);
+            blackCheckers = countCheckers(Color.WHITE);
+        }
+    }
+
+
+    private int countCheckers(Color color) {
+        int count = 0;
+        for (int i = 0; i < ROWS; i++) {
+            for (int j = 0; j < COLUMNS; j++) {
+                if (board[j][i] != null && board[j][i].color == color) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+    private Cell getCell(int x, int y, Color color) {
+        if (x < 0 || x >= COLUMNS || y < 0 || y >= ROWS) {
+            return null;
+        }
+        Cell cell = board[y][x];
+        if (cell.color == null || cell.color != color) {
+            return null;
+        }
+        return new Cell(color, x, y);
+    }
+
+
+
+    private boolean isValidCell(Cell cell) {
+        return cell != null && cell.x >= 0 && cell.x < COLUMNS && cell.y >= 0 && cell.y < ROWS;
+    }
+
+
+    private boolean canMove(Cell from, Cell to) {
+        int dx = Math.abs(to.x - from.x);
+        int dy = Math.abs(to.y - from.y);
+        if (dx != dy) {
+            return false;
+        }
+        if (getCell(to.x, to.y) != null) {
+            return false;
+        }
+        if (dx == 1) {
+            if (from.isQueen()) {
+                return true;
+            }
+            if (from.color == Color.WHITE && to.y > from.y) {
+                return true;
+            }
+            if (from.color == Color.BLACK && to.y < from.y) {
+                return true;
+            }
+        }
+        if (dx == 2) {
+            Cell cell = getCell((from.x + to.x) / 2, (from.y + to.y) / 2);
+            if (cell == null || cell.color == from.color) {
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
+
+private boolean canCapture(Cell from, int direction) {
+    int dx = Math.abs(direction);
+    int dy = direction > 0 ? 1 : -1;
+    Cell cell = getCell(from.x + dx, from.y + dy);
+    if (cell == null || cell.color == from.color) {
+        return false;
+    }
+    cell = getCell(from.x + 2 * dx, from.y + 2 * dy);
+    if (cell == null || cell.color != null) {
+        return false;
+    }
+    return true;
+}
+
+
+    private List<List<Cell>> getPossibleCaptures(Cell from, int direction) {
+        List<List<Cell>> captures = new ArrayList<>();
+        int dx = Math.abs(direction);
+        int dy = direction > 0 ? 1 : -1;
+        Cell cell = getCell(from.x + dx, from.y + dy);
+        if (cell != null && cell.color == from.color.opposite()) {
+            cell = getCell(from.x + 2 * dx, from.y + 2 * dy);
+            if (cell != null && cell.color == null) {
+                List<Cell> capture = new ArrayList<>();
+                capture.add(from);
+                capture.add(cell);
+                captures.add(capture);
+                List<List<Cell>> moreCaptures = getPossibleCaptures(cell, direction);
+                for (List<Cell> moreCapture : moreCaptures) {
+                    List<Cell> newCapture = new ArrayList<>();
+                    newCapture.add(from);
+                    newCapture.addAll(moreCapture);
+                    captures.add(newCapture);
+                }
+            }
+        }
+        return captures;
+    }
+
+
+    private void capture(Cell from, Cell to) {
+        int dx = Math.abs(to.x - from.x);
+        int dy = Math.abs(to.y - from.y);
+        if (dx != 2 || dy != 2) {
+            throw new IllegalArgumentException("Invalid capture: " + from + " -> " + to);
+        }
+        int direction = getDirection(from, to);
+        int x = from.x + Math.abs(direction);
+        int y = from.y + (direction > 0 ? 1 : -1);
+        moveChecker(from, to);
+        removeChecker(getCell(x, y));
+    }
+
+
+    private void moveChecker(Cell from, Cell to) {
+        board[to.x][to.y] = board[from.x][from.y];
+        board[from.x][from.y] = null;
+        if (to.color == Color.WHITE && to.y == ROWS - 1) {
+            to.setQueen(true);
+        }
+        if (to.color == Color.BLACK && to.y == 0) {
+            to.setQueen(true);
+        }
+    }
+
+
+    private void removeChecker(Cell cell) {
+        board[cell.x][cell.y] = null;
+    }
+
+
+    public boolean isGameOver() {
+        return whiteCheckers == 0 || blackCheckers == 0;
+    }
+
+
+    public String getWinner() {
+        if (!isGameOver()) {
+            return null;
+        }
+        return whiteCheckers > 0 ? WHITE : BLACK;
+    }
+
+private int getDirection(Cell from, Cell to) {
+    int dx = to.x - from.x;
+    int dy = to.y - from.y;
+    if (from.isQueen()) {
+        return dx / Math.abs(dx);
+    }
+    if (from.color == Color.WHITE) {
+        return dy > 0 ? 1 : -1;
+    }
+    if (from.color == Color.BLACK) {
+        return dy > 0 ? -1 : 1;
+    }
+    throw new IllegalStateException("Invalid checker color: " + from.color);
+}
+
+
+    private boolean moveEndsWithCapture(List<Cell> move) {
+        if (move.size() < 2) {
+            return false;
+        }
+        Cell from = move.get(move.size() - 2);
+        Cell to = move.get(move.size() - 1);
+        int dx = Math.abs(to.x - from.x);
+        int dy = Math.abs(to.y - from.y);
+        return dx == 2 && dy == 2;
+    }
+
+
+    public void executeMove(List<Cell> move, String color) throws InvalidMoveException, BusyCellException {
+        if (move.isEmpty()) {
+            throw new InvalidMoveException("Invalid move: empty move sequence");
+        }
+        if (move.size() % 2 != 0) {
+            throw new InvalidMoveException("Invalid move: odd number of cells in sequence");
+        }
+        Color c = color.equals(WHITE) ? Color.WHITE : Color.BLACK;
+        if (c != move.get(0).color) {
+            throw new InvalidMoveException("Invalid move: wrong checker color");
+        }
+        List<Cell> sequence = new ArrayList<>();
+        for (int i = 0; i < move.size() - 1; i++) {
+            Cell from = move.get(i);
+            Cell to = move.get(i + 1);
+            if (!isValidCell(from) || !isValidCell(to)) {
+                throw new InvalidMoveException("Invalid move: cell out of bounds");
+            }
+            if (from.color != c) {
+                throw new InvalidMoveException("Invalid move: wrong checker color");
+            }
+            if (i > 0 && !moveEndsWithCapture(sequence)) {
+                throw new InvalidMoveException("Invalid move: must capture all checkers in sequence");
+            }
+            if (!canMove(from, to) && !canCapture(from, getDirection(from, to))) {
+                throw new InvalidMoveException("Invalid move: cannot move or capture checker");
+            }
+            if (canCapture(from, getDirection(from, to))) {
+                List<List<Cell>> captures = getPossibleCaptures(from, getDirection(from, to));
+                if (captures.isEmpty()) {
+                    throw new InvalidMoveException("Invalid move: must capture checker");
+                }
+                if (!captures.contains(sequence)) {
+                    throw new InvalidMoveException("Invalid move: must capture all checkers in sequence");
+                }
+                if (!sequence.isEmpty() && sequence.get(sequence.size() - 1).equals(from)) {
+                    throw new InvalidMoveException("Invalid move: cannot move checker back to the starting position");
+                }
+                capture(from, to);
+                if (canCapture(to, getDirection(to, sequence.get(0)))) {
+                    sequence.add(from);
+                    continue;
+                }
+                break;
+            }
+            if (getCell(to.x, to.y) != null) {
+                throw new BusyCellException("Invalid move: destination cell is busy");
+            }
+            if (to.color == Color.WHITE) {
+                throw new InvalidMoveException("Invalid move: destination cell is white");
+            }
+            if (i > 0 && !sequence.get(sequence.size() - 1).equals(from)) {
+                throw new InvalidMoveException("Invalid move: must move checker to the last cell in sequence");
+            }
+            moveChecker(from, to);
+            if (canCapture(to, getDirection(to, sequence.get(0)))) {
+                sequence.add(from);
+                continue;
+            }
+            break;
+        }
+        if (moveEndsWithCapture(sequence) && !canCapture(move.get(move.size() - 1), getDirection(move.get(move.size() - 1), sequence.get(0)))) {
+            throw new InvalidMoveException("Invalid move: must capture all checkers in sequence");
+        }
+    }
+
+
+    private boolean isValidCell(Cell cell) {
+        return cell != null && cell.x >= 0 && cell.x < COLUMNS && cell.y >= 0 && cell.y < ROWS;
+    }
+
+
+    public List<List<Cell>> getAllPossibleMoves(String color) {
+        List<List<Cell>> moves = new ArrayList<>();
+        Color c = color.equals(WHITE) ? Color.WHITE : Color.BLACK;
+        for (int x = 0; x < COLUMNS; x++) {
+            for (int y = 0; y < ROWS; y++) {
+                Cell from = getCell(x, y);
+                if (from == null || from.color != c) {
+                    continue;
+                }
+                List<List<Cell>> captures = getPossibleCaptures(from, getDirection(from, from));
+                if (!captures.isEmpty()) {
+                    moves.addAll(captures);
+                    continue;
+                }
+                for (int i = -1; i <= 1; i += 2) {
+                    for (int j = -1; j <= 1; j += 2) {
+                        Cell to = getCell(x + i, y + getDirection(from, new Cell(x + i, y + j)));
+                        if (canMove(from, to)) {
+                            List<Cell> move = new ArrayList<>();
+                            move.add(from);
+                            move.add(to);
+                            moves.add(move);
+                        }
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+
+    private List<List<Cell>> getPossibleMoves(Cell from) {
+        List<List<Cell>> moves = new ArrayList<>();
+        List<List<Cell>> captures = getPossibleCaptures(from, getDirection(from, from));
+        if (!captures.isEmpty()) {
+            moves.addAll(captures);
+        } else {
+            for (int i = -1; i <= 1; i += 2) {
+                for (int j = -1; j <= 1; j += 2) {
+                    Cell to = getCell(from.x + i, from.y + getDirection(from, new Cell(from.x + i, from.y + j)));
+                    if (canMove(from, to)) {
+                        List<Cell> move = new ArrayList<>();
+                        move.add(from);
+                        move.add(to);
+                        moves.add(move);
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+
+    private List<List<Cell>> getPossibleCaptureMoves(String color) {
+        List<List<Cell>> moves =
+                new ArrayList<>();
+        Color c = color.equals(WHITE) ? Color.WHITE : Color.BLACK;
+        for (int x = 0; x < COLUMNS; x++) {
+            for (int y = 0; y < ROWS; y++) {
+                Cell from = getCell(x, y);
+                if (from == null || from.color != c) {
+                    continue;
+                }
+                List<List<Cell>> captures = getPossibleCaptures(from, getDirection(from, from));
+                if (!captures.isEmpty()) {
+                    moves.addAll(captures);
+                }
+            }
+        }
+        return moves;
+    }
+
+
+    private List<List<Cell>> getPossibleCaptures(Cell from, int direction) {
+        List<List<Cell>> captures = new ArrayList<>();
+        List<Cell> sequence = new ArrayList<>();
+        sequence.add(from);
+        getPossibleCaptures(from, direction, sequence, captures);
+        return captures;
+    }
+
+
+    private void getPossibleCaptures(Cell from, int direction, List<Cell> sequence, List<List<Cell>> captures) {
+        List<List<Cell>> moves = getPossibleCaptureMoves(sequence.get(sequence.size() - 1), direction);
+        if (moves.isEmpty()) {
+            if (sequence.size() > 1) {
+                captures.add(new ArrayList<>(sequence));
+            }
+            return;
+        }
+        for (List<Cell> move : moves) {
+            Cell to = move.get(move.size() - 1);
+            if (sequence.contains(to)) {
+                continue;
+            }
+            List<Cell> newSequence = new ArrayList<>(sequence);
+            newSequence.addAll(move);
+            getPossibleCaptures(to, direction, newSequence, captures);
+        }
+    }
+
+
+    private List<List<Cell>> getPossibleCaptureMoves(Cell from, int direction) {
+        List<List<Cell>> moves = new ArrayList<>();
+        for (int i = -1; i <= 1; i += 2) {
+            for (int j = -1; j <= 1; j += 2) {
+                Cell to = getCell(from.x + 2 * i, from.y + 2 * direction * j);
+                if (canCapture(from, getDirection(from, to))) {
+                    List<Cell> move = new ArrayList<>();
+                    move.add(from);
+                    move.add(to);
+                    moves.add(move);
+                }
+            }
+        }
+        return moves;
+    }
+
+
+    private boolean canMove(Cell from, Cell to) {
+        if (to == null) {
+            return false;
+        }
+        if (from.isQueen()) {
+            return canMoveQueen(from, to);
+        }
+        if (from.color == Color.WHITE) {
+            return canMoveWhite(from, to);
+        }
+        if (from.color == Color.BLACK) {
+            return canMoveBlack(from, to);
+        }
+        throw new IllegalStateException("Invalid checker color: " + from.color);
+    }
+
+
+    private boolean canMoveWhite(Cell from, Cell to) {
+        int dx = Math.abs(to.x - from.x);
+        int dy = to.y - from.y;
+        return dx == 1 && dy == 1;
+    }
+
+
+    private
+    boolean canMoveBlack(Cell from, Cell to) {
+        int dx = Math.abs(to.x - from.x);
+        int dy = to.y - from.y;
+        return dx == 1 && dy == -1;
+    }
+
+
+    private boolean canMoveQueen(Cell from, Cell to) {
+        int dx = Math.abs(to.x - from.x);
+        int dy = Math.abs(to.y - from.y);
+        return dx == dy && dx > 0;
+    }
+
+
+    private boolean canCapture(Cell from, int direction) {
+        for (int i = -1; i <= 1; i += 2) {
+            for (int j = -1; j <= 1; j += 2) {
+                Cell to = getCell(from.x + 2 * i, from.y + 2 * direction * j);
+                if (canCapture(from, to, getCell(from.x + i, from.y + direction * j))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+
+    private boolean canCapture(Cell from, Cell to, Cell intermediate) {
+        if (to == null || intermediate == null || from.color == intermediate.color || to.color != null) {
+            return false;
+        }
+        if (from.isQueen()) {
+            return canCaptureQueen(from, to, intermediate);
+        }
+        if (from.color == Color.WHITE) {
+            return canCaptureWhite(from, to, intermediate);
+        }
+        if (from.color == Color.BLACK) {
+            return canCaptureBlack(from, to, intermediate);
+        }
+        throw new IllegalStateException("Invalid checker color: " + from.color);
+    }
+
+
+    private boolean canCaptureWhite(Cell from, Cell to, Cell intermediate) {
+        int dx = Math.abs(to.x - from.x);
+        int dy = to.y - from.y;
+        return dx == 2 && dy == 2 && intermediate.color == Color.BLACK;
+    }
+
+
+    private boolean canCaptureBlack(Cell from, Cell to, Cell intermediate) {
+        int dx = Math.abs(to.x - from.x);
+        int dy = to.y - from.y;
+        return dx == 2 && dy == -2 && intermediate.color == Color.WHITE;
+    }
+
+
+    private boolean canCaptureQueen(Cell from, Cell to, Cell intermediate) {
+        int dx = Math.abs(to.x - from.x);
+        int dy = Math.abs(to.y - from.y);
+        return dx == dy && dx > 0 && intermediate.color != from.color;
+    }
+
+
+    private int getDirection(Cell from, Cell to) {
+        if (from.isQueen()) {
+            return getDirectionQueen(from, to);
+        }
+        if (from.color == Color.WHITE) {
+            return 1;
+        }
+        if (from.color == Color.BLACK) {
+            return -1;
+        }
+        throw new IllegalStateException("Invalid checker color: " + from.color);
+    }
+
+
+    private int getDirectionQueen(Cell from, Cell to) {
+        int dy = to.y - from.y;
+        return dy > 0 ? 1 : -1;
+    }
+
+
+    private Cell getCell(int x, int y) {
+        if (x < 0 || x >= COLUMNS || y < 0 || y >= ROWS) {
+            return null;
+        }
+        return board[y][x];
+    }
+
+
+    private void setCell(int x, int y, Color color, CheckerType type) {
+        Cell cell = board[y][x];
+        cell.color = color;
+        cell.type = type;
+    }
+
+
+
+    private static class Cell {
+        Color color;
+        CheckerType type;
+        int x;
+        int y;
+
+        Cell(Color color, int x, int y) {
+            this.color = color;
+            this.x = x;
+            this.y = y;
+        }
+
+        boolean isQueen() {
+            return type == CheckerType.QUEEN;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append((char) (x + 'a'));
+            sb.append(ROWS - y);
+            return sb.toString();
+        }
+    }
+}
+
+
+class InvalidMoveException extends Exception {
+    InvalidMoveException(String message) {
+        super(message);
+    }
+}
+
+
+class CellBusyException extends Exception {
+    CellBusyException(String message) {
+        super(message);
+    }
+}
+
+
+class WhiteCellException extends Exception {
+    WhiteCellException(String message) {
+        super(message);
+    }
+}
+
+
+class InvalidCaptureException extends Exception {
+    InvalidCaptureException(String message) {
+        super(message);
+    }
+}
+
+
+class GeneralException extends RuntimeException {
+    GeneralException(String message) {
+        super(message);
+    }
+}
+
+
+enum CheckerType {
+    NORMAL, QUEEN
+}
+
+
+enum Color {
+    BLACK,
+    WHITE;
+
+    /**
+     * Returns the opposite color.
+     */
+    Color opposite() {
+        return this == BLACK ? WHITE : BLACK;
+    }
+}
+
+
+public class Main {
+    public static void main(String[] args) {
+        Checkerboard board = new Checkerboard();
+        Scanner scanner = new Scanner(System.in);
+        String whiteCoords = scanner.nextLine();
+        String blackCoords = scanner.nextLine();
+        board.initializeBoard(whiteCoords, blackCoords);
+        while (scanner.hasNextLine()) {
+            String moveLine = scanner.nextLine();
+            String[] moves = moveLine.split(" ");
+            try {
+                board.makeMove(moves[0], moves[1]);
+            } catch (InvalidMoveException e) {
+                System.out.println("Invalid move: " + e.getMessage());
+                return;
+            } catch (CellBusyException e) {
+                System.out.println("Cell is busy: " + e.getMessage());
+                return;
+            } catch (WhiteCellException e) {
+                System.out.println("Cannot move to white cell: " + e.getMessage());
+                return;
+            } catch (InvalidCaptureException e) {
+                System.out.println("Must capture if possible: " + e.getMessage());
+                return;
+            } catch (Exception e) {
+                System.out.println("Unexpected error: " + e.getMessage());
+                return;
+            }
+        }
+        System.out.println(board.getWhiteCoords());
+        System.out.println(board.getBlackCoords());
+    }
+}
+
