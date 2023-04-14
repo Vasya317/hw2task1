@@ -24,7 +24,62 @@ public class Checkerboard {
         initCheckers(blackCoords, Color.BLACK);
     }
 
+    public void move(String moveStr) throws InvalidMoveException {
+        Move move = parseMove(moveStr);
+        List<Move> mandatoryMoves = getMandatoryMoves(currentMoveColor);
+        if (!mandatoryMoves.isEmpty() && !mandatoryMoves.contains(move)) {
+            throw new InvalidMoveException("invalid move - mandatory move exists");
+        }
+        List<Move> chainMoves = getChainMoves(move);
+        if (chainMoves.isEmpty() && !mandatoryMoves.isEmpty()) {
+            throw new InvalidMoveException("invalid move - mandatory move exists");
+        }
+        if (!chainMoves.isEmpty()) {
+            for (Move chainMove : chainMoves) {
+                executeMove(chainMove);
+                if (!canMoveFurther(chainMove.getTo())) {
+                    break;
+                }
+            }
+        } else {
+            executeMove(move);
+        }
+        if (canCapture(currentMoveColor, move.getTo())) {
+            List<Move> captureMoves = getCaptureMoves(currentMoveColor, move.getTo());
+            if (!captureMoves.isEmpty()) {
+                return;
+            }
+        }
+        currentMoveColor = currentMoveColor.opposite();
+    }
 
+    public Move parseMove(String moveStr) throws InvalidMoveException {
+        // Implementation of parseMove method
+        String[] moveParts = moveStr.split(":");
+        List<Cell> cells = new ArrayList<>();
+        for (String part : moveParts) {
+            cells.add(parseCell(part));
+        }
+        if (cells.size() < 2) {
+            throw new InvalidMoveException("invalid move - must specify at least two cells");
+        }
+        Move move = new Move(cells.get(0), cells.get(cells.size() - 1));
+        for (int i = 1; i < cells.size(); i++) {
+            Cell current = cells.get(i);
+            Cell previous = cells.get(i - 1);
+            if (Math.abs(current.getX() - previous.getX()) != 2 || Math.abs(current.getY() - previous.getY()) != 2) {
+                throw new InvalidMoveException("invalid move - cells are not adjacent");
+            }
+            if (!canCapture(currentMoveColor, previous)) {
+                throw new InvalidMoveException("invalid move - checker can capture");
+            }
+            if (!isValidCapture(currentMoveColor, previous, current)) {
+                throw new InvalidMoveException("invalid move - invalid capture");
+            }
+            move.addCapturedCell(getCapturedCell(previous, current));
+        }
+        return move;
+    }
     private void initCheckers(String positions, Color color) {
         for (String pos : positions.split(" ")) {
             int x = pos.charAt(0) - 'a';
@@ -41,17 +96,22 @@ public class Checkerboard {
     }
 
 
-    private int countCheckers(Color color) {
+    public int getCheckersCount(Color color) {
         int count = 0;
-        for (int i = 0; i < ROWS; i++) {
-            for (int j = 0; j < COLUMNS; j++) {
-                if (board[j][i] != null && board[j][i].color == color) {
+        for (Cell[] row : cells) {
+            for (Cell cell : row) {
+                if (!cell.isEmpty() && cell.getColor() == color) {
                     count++;
                 }
             }
         }
         return count;
     }
+
+    public Cell[][] getCells() {
+        return cells;
+    }
+
     private Cell getCell(int x, int y, Color color) {
         if (x < 0 || x >= COLUMNS || y < 0 || y >= ROWS) {
             return null;
@@ -184,20 +244,20 @@ private boolean canCapture(Cell from, int direction) {
         return whiteCheckers > 0 ? WHITE : BLACK;
     }
 
-private int getDirection(Cell from, Cell to) {
-    int dx = to.x - from.x;
-    int dy = to.y - from.y;
-    if (from.isQueen()) {
-        return dx / Math.abs(dx);
+    private int getDirection(Cell from, Cell to) {
+        int dx = to.x - from.x;
+        int dy = to.y - from.y;
+        if (from.isQueen()) {
+            return dx / Math.abs(dx);
+        }
+        if (from.color == Color.WHITE) {
+            return dy > 0 ? 1 : -1;
+        }
+        if (from.color == Color.BLACK) {
+            return dy > 0 ? -1 : 1;
+        }
+        throw new IllegalStateException("Invalid checker color: " + from.color);
     }
-    if (from.color == Color.WHITE) {
-        return dy > 0 ? 1 : -1;
-    }
-    if (from.color == Color.BLACK) {
-        return dy > 0 ? -1 : 1;
-    }
-    throw new IllegalStateException("Invalid checker color: " + from.color);
-}
 
 
     private boolean moveEndsWithCapture(List<Cell> move) {
@@ -552,6 +612,11 @@ private int getDirection(Cell from, Cell to) {
             sb.append(ROWS - y);
             return sb.toString();
         }
+
+        public void setQueen() {
+            type = "q";
+        }
+
     }
 }
 
@@ -606,40 +671,45 @@ enum Color {
     Color opposite() {
         return this == BLACK ? WHITE : BLACK;
     }
-}
 
-
-public class Main {
-    public static void main(String[] args) {
-        Checkerboard board = new Checkerboard();
-        Scanner scanner = new Scanner(System.in);
-        String whiteCoords = scanner.nextLine();
-        String blackCoords = scanner.nextLine();
-        board.initializeBoard(whiteCoords, blackCoords);
-        while (scanner.hasNextLine()) {
-            String moveLine = scanner.nextLine();
-            String[] moves = moveLine.split(" ");
-            try {
-                board.makeMove(moves[0], moves[1]);
-            } catch (InvalidMoveException e) {
-                System.out.println("Invalid move: " + e.getMessage());
-                return;
-            } catch (CellBusyException e) {
-                System.out.println("Cell is busy: " + e.getMessage());
-                return;
-            } catch (WhiteCellException e) {
-                System.out.println("Cannot move to white cell: " + e.getMessage());
-                return;
-            } catch (InvalidCaptureException e) {
-                System.out.println("Must capture if possible: " + e.getMessage());
-                return;
-            } catch (Exception e) {
-                System.out.println("Unexpected error: " + e.getMessage());
-                return;
-            }
+    public Color opposite() {
+        if (this == WHITE) {
+            return BLACK;
+        } else {
+            return WHITE;
         }
-        System.out.println(board.getWhiteCoords());
-        System.out.println(board.getBlackCoords());
     }
+
 }
+
+
+    public static void main(String[] args) {
+        try {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+            String whiteStr = reader.readLine();
+            String blackStr = reader.readLine();
+            Board board = new Board(whiteStr, blackStr);
+            while (true) {
+                String moveStr = reader.readLine();
+                if (moveStr == null) {
+                    break;
+                }
+                Move move = board.parseMove(moveStr);
+                board.move(move);
+                Color oppositeColor = board.getCurrentMoveColor().opposite();
+                if (board.getCheckersCount(oppositeColor) == 0) {
+                    System.out.println("Game over. " + board.getCurrentMoveColor() + " wins.");
+                    break;
+                }
+            }
+            System.out.println(board);
+        } catch (InvalidMoveException e) {
+            System.out.println("invalid move");
+        } catch (IOException e) {
+            System.out.println("IO error occurred");
+        } catch (Exception e) {
+            System.out.println("general error occurred");
+        }
+    }
+
 
