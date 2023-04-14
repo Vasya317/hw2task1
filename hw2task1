@@ -49,7 +49,7 @@ public class Checkerboard {
         if (cells.size() < 2) {
             throw new InvalidMoveException("Invalid move: " + moveStr);
         }
-        Checker checker = cells.get(0).getChecker();
+        Checker checker = cells.get(0).checker;
         if (checker == null || checker.getColor() != color) {
             throw new InvalidMoveException("Invalid move: " + moveStr);
         }
@@ -60,13 +60,14 @@ public class Checkerboard {
                 throw new InvalidMoveException("Invalid move: " + moveStr);
             }
             Cell middle = getMiddleCell(cells.get(i - 1), target);
-            if (middle == null || middle.isEmpty() || middle.getChecker().getColor() == color) {
+            if (middle == null || middle.isEmpty() || middle.checker.getColor() == color) {
                 throw new InvalidMoveException("Invalid move: " + moveStr);
             }
             move.addCapture(middle);
         }
         return move;
     }
+
 
 
     private void initCheckers(String positions, Color color) {
@@ -583,6 +584,7 @@ private boolean canCapture(Cell from, int direction) {
         CheckerType type;
         int x;
         int y;
+        Checker checker;
 
         Cell(Color color, int x, int y) {
             this.color = color;
@@ -594,6 +596,10 @@ private boolean canCapture(Cell from, int direction) {
             return type == CheckerType.QUEEN;
         }
 
+        void setChecker(Checker checker) {
+            this.checker = checker;
+        }
+
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
@@ -602,10 +608,11 @@ private boolean canCapture(Cell from, int direction) {
             return sb.toString();
         }
 
-        Checker getChecker() {
-            return checker;
+        boolean isEmpty() {
+            return checker == null;
         }
     }
+
 }
 
 
@@ -661,46 +668,38 @@ enum Color {
     }
 
     public Color opposite() {
-        if (this == WHITE) {
-            return BLACK;
-        } else {
-            return WHITE;
-        }
-    }
-
-    public Color opposite() {
         return this == WHITE ? BLACK : WHITE;
     }
 }
 
 
-    public static void main(String[] args) {
-        try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-            String whiteStr = reader.readLine();
-            String blackStr = reader.readLine();
-            Board board = new Board(whiteStr, blackStr);
-            while (true) {
-                String moveStr = reader.readLine();
-                if (moveStr == null) {
-                    break;
-                }
-                Move move = board.parseMove(moveStr);
-                board.move(move);
-                Color oppositeColor = board.getCurrentMoveColor().opposite();
-                if (board.getCheckersCount(oppositeColor) == 0) {
-                    System.out.println("Game over. " + board.getCurrentMoveColor() + " wins.");
-                    break;
-                }
+public static void main(String[] args) {
+    try {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String whiteStr = reader.readLine();
+        String blackStr = reader.readLine();
+        Board board = new Board(whiteStr, blackStr);
+        while (true) {
+            String moveStr = reader.readLine();
+            if (moveStr == null) {
+                break;
             }
-            System.out.println(board);
-        } catch (InvalidMoveException e) {
-            System.out.println("invalid move");
-        } catch (IOException e) {
-            System.out.println("IO error occurred");
-        } catch (Exception e) {
-            System.out.println("general error occurred");
+            Move move = board.parseMove(moveStr);
+            board.move(move);
+            Color oppositeColor = board.getCurrentMoveColor().opposite();
+            if (board.getCheckersCount(oppositeColor) == 0) {
+                System.out.println("Game over. " + board.getCurrentMoveColor() + " wins.");
+                break;
+            }
         }
+        System.out.println(board);
+    } catch (InvalidMoveException e) {
+        System.out.println("invalid move");
+    } catch (IOException e) {
+        System.out.println("IO error occurred");
+    } catch (Exception e) {
+        System.out.println("general error occurred");
     }
+}
 
 
