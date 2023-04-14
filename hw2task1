@@ -39,6 +39,7 @@ public class Checkerboard {
     }
 
 
+
     private Move parseMove(String moveStr, Color color) throws InvalidMoveException {
         String[] positions = moveStr.split(":");
         List<Cell> cells = new ArrayList<>();
@@ -66,6 +67,7 @@ public class Checkerboard {
         }
         return move;
     }
+
 
     private void initCheckers(String positions, Color color) {
         for (String pos : positions.split(" ")) {
@@ -600,10 +602,9 @@ private boolean canCapture(Cell from, int direction) {
             return sb.toString();
         }
 
-        public void setQueen() {
-            type = "q";
+        Checker getChecker() {
+            return checker;
         }
-
     }
 }
 
@@ -667,6 +668,9 @@ enum Color {
         }
     }
 
+    public Color opposite() {
+        return this == WHITE ? BLACK : WHITE;
+    }
 }
 
 
