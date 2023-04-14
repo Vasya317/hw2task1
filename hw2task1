@@ -24,62 +24,49 @@ public class Checkerboard {
         initCheckers(blackCoords, Color.BLACK);
     }
 
-    public void move(String moveStr) throws InvalidMoveException {
-        Move move = parseMove(moveStr);
-        List<Move> mandatoryMoves = getMandatoryMoves(currentMoveColor);
-        if (!mandatoryMoves.isEmpty() && !mandatoryMoves.contains(move)) {
-            throw new InvalidMoveException("invalid move - mandatory move exists");
+    public void move(Color color, String moveStr) throws InvalidMoveException {
+        Move move = board.parseMove(moveStr, color);
+        if (!getMandatoryMoves(color).isEmpty() && !move.isMandatory()) {
+            throw new InvalidMoveException("Invalid move: mandatory move exists");
         }
-        List<Move> chainMoves = getChainMoves(move);
-        if (chainMoves.isEmpty() && !mandatoryMoves.isEmpty()) {
-            throw new InvalidMoveException("invalid move - mandatory move exists");
+        if (!move.isValid()) {
+            throw new InvalidMoveException("Invalid move: " + moveStr);
         }
-        if (!chainMoves.isEmpty()) {
-            for (Move chainMove : chainMoves) {
-                executeMove(chainMove);
-                if (!canMoveFurther(chainMove.getTo())) {
-                    break;
-                }
-            }
-        } else {
-            executeMove(move);
+        move.execute();
+        if (move.isCapture() && board.getCaptureMoves(color, move.getTarget()).isEmpty()) {
+            changeTurn();
         }
-        if (canCapture(currentMoveColor, move.getTo())) {
-            List<Move> captureMoves = getCaptureMoves(currentMoveColor, move.getTo());
-            if (!captureMoves.isEmpty()) {
-                return;
-            }
-        }
-        currentMoveColor = currentMoveColor.opposite();
     }
 
-    public Move parseMove(String moveStr) throws InvalidMoveException {
-        // Implementation of parseMove method
-        String[] moveParts = moveStr.split(":");
+
+    private Move parseMove(String moveStr, Color color) throws InvalidMoveException {
+        String[] positions = moveStr.split(":");
         List<Cell> cells = new ArrayList<>();
-        for (String part : moveParts) {
-            cells.add(parseCell(part));
+        for (String position : positions) {
+            cells.add(getCell(position));
         }
         if (cells.size() < 2) {
-            throw new InvalidMoveException("invalid move - must specify at least two cells");
+            throw new InvalidMoveException("Invalid move: " + moveStr);
+        }
+        Checker checker = cells.get(0).getChecker();
+        if (checker == null || checker.getColor() != color) {
+            throw new InvalidMoveException("Invalid move: " + moveStr);
         }
         Move move = new Move(cells.get(0), cells.get(cells.size() - 1));
         for (int i = 1; i < cells.size(); i++) {
-            Cell current = cells.get(i);
-            Cell previous = cells.get(i - 1);
-            if (Math.abs(current.getX() - previous.getX()) != 2 || Math.abs(current.getY() - previous.getY()) != 2) {
-                throw new InvalidMoveException("invalid move - cells are not adjacent");
+            Cell target = cells.get(i);
+            if (!target.isEmpty()) {
+                throw new InvalidMoveException("Invalid move: " + moveStr);
             }
-            if (!canCapture(currentMoveColor, previous)) {
-                throw new InvalidMoveException("invalid move - checker can capture");
+            Cell middle = getMiddleCell(cells.get(i - 1), target);
+            if (middle == null || middle.isEmpty() || middle.getChecker().getColor() == color) {
+                throw new InvalidMoveException("Invalid move: " + moveStr);
             }
-            if (!isValidCapture(currentMoveColor, previous, current)) {
-                throw new InvalidMoveException("invalid move - invalid capture");
-            }
-            move.addCapturedCell(getCapturedCell(previous, current));
+            move.addCapture(middle);
         }
         return move;
     }
+
     private void initCheckers(String positions, Color color) {
         for (String pos : positions.split(" ")) {
             int x = pos.charAt(0) - 'a';
